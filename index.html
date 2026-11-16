@@ -1,0 +1,870 @@
+<!DOCTYPE html>
+<html lang="ro">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#ECEFED" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#121514" media="(prefers-color-scheme: dark)">
+<title>Scanare echipamente</title>
+<script src="https://cdn.jsdelivr.net/npm/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+<style>
+:root {
+  color-scheme: light;
+  --bg: #ECEFED;
+  --surface: #FFFFFF;
+  --ink: #161A18;
+  --muted: #59615C;
+  --line: #D3D9D5;
+  --plate: #1F2522;
+  --plate-ink: #F4F6F5;
+  --plate-muted: #AEB7B2;
+  --ok: #2B7A4B;   --ok-bg: #E3F1E8;
+  --warn: #A85A00; --warn-bg: #FBEBD6;
+  --err: #B42318;  --err-bg: #FBE4E1;
+  --wait: #59615C; --wait-bg: #E6E9E7;
+  --btn: #161A18;  --btn-ink: #FFFFFF;
+  --mono: ui-monospace, "SF Mono", "Roboto Mono", Menlo, Consolas, monospace;
+  --sans: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    color-scheme: dark;
+    --bg: #121514; --surface: #1B1F1D; --ink: #E9EDEB; --muted: #A2ABA6; --line: #2E3532;
+    --plate: #E9EDEB; --plate-ink: #121514; --plate-muted: #4E5652;
+    --ok: #5CC287; --ok-bg: #173323; --warn: #F0A24A; --warn-bg: #3A2810;
+    --err: #F07167; --err-bg: #3D1916; --wait: #A2ABA6; --wait-bg: #252A28;
+    --btn: #E9EDEB; --btn-ink: #121514;
+  }
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; background: var(--bg); color: var(--ink); font-family: var(--sans);
+  font-size: 16px; line-height: 1.45; -webkit-text-size-adjust: 100%; }
+body { padding: env(safe-area-inset-top) 0 0; }
+.wrap { max-width: 560px; margin: 0 auto; padding: 12px 16px 140px; }
+button, input { font: inherit; color: inherit; }
+button { cursor: pointer; }
+:focus-visible { outline: 3px solid var(--ok); outline-offset: 2px; }
+.mono { font-family: var(--mono); }
+.muted { color: var(--muted); }
+[hidden] { display: none !important; }
+
+/* bara de sus */
+.top { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; }
+.project { font-weight: 600; font-size: 15px; flex: 1; min-width: 0; overflow: hidden;
+  text-overflow: ellipsis; white-space: nowrap; }
+.chip { font-size: 12.5px; padding: 3px 9px; border-radius: 999px; border: 1px solid var(--line);
+  background: var(--surface); white-space: nowrap; display: inline-flex; align-items: center; gap: 6px; }
+.chip .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--ok); }
+.chip.off .dot { background: var(--err); }
+.chip.queue { border-color: var(--warn); color: var(--warn); }
+.iconbtn { width: 40px; height: 40px; border-radius: 10px; border: 1px solid var(--line);
+  background: var(--surface); display: grid; place-items: center; flex: none; }
+.iconbtn svg { width: 20px; height: 20px; }
+
+/* plăcuța camerei active */
+.plate { background: var(--plate); color: var(--plate-ink); border-radius: 14px; padding: 14px 16px 16px;
+  margin-bottom: 12px; }
+.plate .lbl { font-size: 13px; color: var(--plate-muted); }
+.plate .code { font-size: 40px; font-weight: 700; letter-spacing: 0.01em; line-height: 1.1;
+  font-variant-numeric: tabular-nums; margin-top: 2px; word-break: break-all; }
+.plate .name { font-size: 18px; margin-top: 2px; }
+.plate .meta { font-size: 13px; color: var(--plate-muted); margin-top: 8px; }
+.plate.empty { background: transparent; color: var(--ink); border: 2px dashed var(--line); }
+.plate.empty .lbl, .plate.empty .meta { color: var(--muted); }
+.plate.empty .code { font-size: 22px; }
+
+/* rezultat */
+.result { background: var(--surface); border-radius: 14px; padding: 14px 16px; margin-bottom: 12px;
+  border-left: 6px solid var(--line); }
+.result.ok { background: var(--ok-bg); border-left-color: var(--ok); }
+.result.warn { background: var(--warn-bg); border-left-color: var(--warn); }
+.result.err { background: var(--err-bg); border-left-color: var(--err); }
+.result.wait { background: var(--wait-bg); border-left-color: var(--wait); }
+.result h2 { margin: 0 0 4px; font-size: 22px; line-height: 1.2; }
+.result.ok h2 { color: var(--ok); } .result.warn h2 { color: var(--warn); } .result.err h2 { color: var(--err); }
+.result p { margin: 4px 0 0; }
+.dev { margin: 8px 0 4px; }
+.dev .n { font-weight: 600; font-size: 17px; }
+.dev .s { font-family: var(--mono); font-size: 16px; }
+.note { margin-top: 8px; font-weight: 600; }
+
+.card { background: var(--surface); border-radius: 14px; padding: 14px 16px; margin-bottom: 12px;
+  border: 1px solid var(--line); }
+.card h3 { margin: 0 0 6px; font-size: 16px; }
+.row { display: flex; gap: 8px; margin-top: 10px; }
+.row > * { flex: 1; }
+input[type=text], input[type=search], input[type=tel] { width: 100%; height: 48px; border-radius: 10px;
+  border: 1px solid var(--line); background: var(--surface); padding: 0 12px; font-size: 17px; }
+
+/* camera */
+.scanner { background: #000; border-radius: 14px; overflow: hidden; margin-bottom: 12px; }
+#reader { width: 100%; }
+#reader video { display: block; width: 100% !important; height: auto !important; }
+
+/* istoric */
+.history h3 { font-size: 14px; color: var(--muted); font-weight: 600; margin: 18px 0 6px; }
+.history ol { list-style: none; margin: 0; padding: 0; }
+.history li { display: grid; grid-template-columns: 10px 48px 1fr; gap: 8px; align-items: baseline;
+  padding: 8px 0; border-bottom: 1px solid var(--line); font-size: 14px; }
+.history li .d { width: 8px; height: 8px; border-radius: 50%; background: var(--wait); align-self: center; }
+.history li.ok .d { background: var(--ok); } .history li.warn .d { background: var(--warn); }
+.history li.err .d { background: var(--err); }
+.history li .t { font-family: var(--mono); font-size: 12.5px; color: var(--muted); }
+.history li .c { font-family: var(--mono); font-size: 13px; color: var(--muted); white-space: nowrap; }
+
+/* butoane */
+.btn { display: flex; align-items: center; justify-content: center; gap: 8px; width: 100%; min-height: 54px;
+  border-radius: 12px; border: 1px solid var(--btn); background: var(--btn); color: var(--btn-ink);
+  font-weight: 600; font-size: 17px; padding: 8px 14px; text-align: center; }
+.btn.sec { background: var(--surface); color: var(--ink); border-color: var(--line); }
+.btn.small { min-height: 44px; font-size: 15px; }
+.btn:disabled { opacity: 0.5; }
+.btn svg { width: 22px; height: 22px; flex: none; }
+.actions { position: fixed; left: 0; right: 0; bottom: 0; background: var(--bg);
+  border-top: 1px solid var(--line); padding: 10px 16px calc(10px + env(safe-area-inset-bottom)); z-index: 5; }
+.actions .in { max-width: 560px; margin: 0 auto; display: flex; gap: 10px; }
+.actions .in .btn.sec { flex: 0 0 38%; }
+
+/* foaia suprapusă */
+.sheet { position: fixed; inset: 0; background: var(--bg); z-index: 20; display: flex; flex-direction: column; }
+.sheet header { display: flex; align-items: center; gap: 10px; padding: calc(10px + env(safe-area-inset-top)) 16px 10px;
+  border-bottom: 1px solid var(--line); background: var(--surface); }
+.sheet header h2 { flex: 1; margin: 0; font-size: 18px; }
+.sheet .body { flex: 1; overflow-y: auto; padding: 14px 16px 24px; max-width: 560px; width: 100%; margin: 0 auto; }
+.sheet .foot { padding: 10px 16px calc(10px + env(safe-area-inset-bottom)); border-top: 1px solid var(--line);
+  background: var(--surface); }
+.sheet .foot .in { max-width: 560px; margin: 0 auto; display: grid; gap: 8px; }
+.group { font-size: 14px; color: var(--muted); font-weight: 600; margin: 16px 0 6px; }
+.pick { display: block; width: 100%; text-align: left; background: var(--surface); border: 1px solid var(--line);
+  border-radius: 12px; padding: 12px 14px; margin-bottom: 8px; }
+.pick .n { font-weight: 600; }
+.pick .s { font-family: var(--mono); font-size: 16px; }
+.pick .m { font-size: 13px; color: var(--muted); }
+.serialbig { font-family: var(--mono); font-size: 30px; font-weight: 700; letter-spacing: 0.04em;
+  background: var(--surface); border: 2px solid var(--ink); border-radius: 12px; padding: 14px; text-align: center;
+  word-break: break-all; margin: 10px 0; }
+.alert { border-radius: 12px; padding: 10px 12px; margin: 10px 0; font-size: 15px; }
+.alert.warn { background: var(--warn-bg); color: var(--ink); border-left: 5px solid var(--warn); }
+.alert.err { background: var(--err-bg); color: var(--ink); border-left: 5px solid var(--err); }
+.alert.ok { background: var(--ok-bg); color: var(--ink); border-left: 5px solid var(--ok); }
+.list-plain { margin: 0; padding: 0; list-style: none; }
+.list-plain li { padding: 8px 0; border-bottom: 1px solid var(--line); }
+.list-plain li .s { font-family: var(--mono); font-size: 14px; color: var(--muted); }
+.kv { display: grid; grid-template-columns: auto 1fr; gap: 4px 12px; font-size: 14px; }
+.kv dt { color: var(--muted); } .kv dd { margin: 0; word-break: break-all; }
+@media (prefers-reduced-motion: no-preference) {
+  .result { animation: pop .18s ease-out; }
+  @keyframes pop { from { transform: scale(0.985); opacity: .6; } to { transform: none; opacity: 1; } }
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="top">
+    <div class="project" id="project">Scanare echipamente</div>
+    <span class="chip" id="conn"><span class="dot"></span><span id="connTxt">Online</span></span>
+    <span class="chip queue" id="queueChip" hidden></span>
+    <span class="chip" id="teamChip" hidden>Configurator</span>
+    <button class="iconbtn" id="settingsBtn" aria-label="Setări">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>
+    </button>
+  </div>
+
+  <section class="plate" id="plate" aria-live="polite"></section>
+  <section id="result" aria-live="assertive"></section>
+  <section class="card" id="nameCard" hidden>
+    <h3>Cum vă numiți?</h3>
+    <p class="muted" style="margin:0">Numele apare în jurnal lângă scanările de pe acest telefon. Este opțional și se cere o singură dată.</p>
+    <div class="row"><input type="text" id="nameInput" autocomplete="name" placeholder="Prenume și nume"></div>
+    <div class="row"><button class="btn small" id="nameSave">Salvează numele</button><button class="btn small sec" id="nameSkip">Nu acum</button></div>
+  </section>
+  <section class="scanner" id="scannerWrap" hidden><div id="reader"></div></section>
+  <section class="history"><h3>Ultimele scanări de pe acest telefon</h3><ol id="history"></ol></section>
+</div>
+
+<div class="actions"><div class="in">
+  <button class="btn sec" id="closeRoomBtn" hidden>Verifică camera</button>
+  <button class="btn" id="scanBtn">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7V5a2 2 0 0 1 2-2h2M17 3h2a2 2 0 0 1 2 2v2M21 17v2a2 2 0 0 1-2 2h-2M7 21H5a2 2 0 0 1-2-2v-2"/><path d="M7 12h10"/></svg>
+    <span id="scanTxt">Pornește camera</span>
+  </button>
+</div></div>
+
+<div class="sheet" id="sheet" hidden role="dialog" aria-modal="true" aria-labelledby="sheetTitle">
+  <header><h2 id="sheetTitle"></h2><button class="iconbtn" id="sheetClose" aria-label="Închide">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg></button></header>
+  <div class="body" id="sheetBody"></div>
+  <div class="foot" id="sheetFoot" hidden><div class="in" id="sheetFootIn"></div></div>
+</div>
+
+<script>
+'use strict';
+/* ====================================================================
+ * CONFIGURARE: lipiți mai jos adresa aplicației web (se termină cu /exec)
+ * ==================================================================== */
+const API_URL = 'LIPITI_AICI_ADRESA_APLICATIEI_WEB';
+/* ==================================================================== */
+
+const APP_VERSION = '1.0';
+const $ = s => document.querySelector(s);
+const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const LS = {
+  get(k, d) { try { const v = localStorage.getItem('qr_' + k); return v === null ? d : JSON.parse(v); } catch (e) { return d; } },
+  set(k, v) { try { localStorage.setItem('qr_' + k, JSON.stringify(v)); } catch (e) { /* stocare indisponibilă */ } },
+  del(k) { try { localStorage.removeItem('qr_' + k); } catch (e) { /* */ } }
+};
+function newId() {
+  if (window.crypto && crypto.randomUUID) return crypto.randomUUID();
+  return Date.now().toString(36) + Math.random().toString(36).slice(2, 10);
+}
+
+const S = {
+  device: LS.get('device', '') || newId(),
+  operator: LS.get('operator', ''),
+  namePrompted: LS.get('namePrompted', false),
+  team: LS.get('team', ''),
+  timeoutMin: LS.get('timeout', 20),
+  project: LS.get('project', ''),
+  rooms: LS.get('rooms', {}),
+  queue: LS.get('queue', []),
+  history: LS.get('history', []),
+  busy: false, scanning: false, resumeAfterSheet: false,
+  lastCode: '', lastTime: 0, flushing: false,
+  apiOk: /^https:\/\/script\.google\.com\//.test(API_URL)
+};
+LS.set('device', S.device);
+
+/* ---------- comunicarea cu serverul ---------- */
+async function api(action, data) {
+  if (!S.apiOk) throw new Error('Pagina nu este conectată la server: completați API_URL în index.html.');
+  const ctl = new AbortController();
+  const timer = setTimeout(() => ctl.abort(), 15000);
+  let res;
+  try {
+    res = await fetch(API_URL, {
+      method: 'POST', redirect: 'follow', signal: ctl.signal,
+      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+      body: JSON.stringify(Object.assign({ action: action }, data || {}))
+    });
+  } catch (e) {
+    const err = new Error('Fără conexiune la server.'); err.network = true; throw err;
+  } finally { clearTimeout(timer); }
+  let j;
+  try { j = await res.json(); } catch (e) {
+    throw new Error('Serverul a trimis un răspuns invalid. Verificați publicarea scriptului (acces: Oricine).');
+  }
+  if (!j.ok) {
+    const msg = String(j.error || 'Eroare necunoscută.');
+    const err = new Error(msg.replace(/^TEAM:\s*/, ''));
+    if (/^TEAM:/.test(msg)) { err.team = true; S.team = ''; LS.del('team'); renderStatus(); }
+    throw err;
+  }
+  return j;
+}
+
+function deviceLabel() {
+  const ua = navigator.userAgent;
+  const os = /iPhone|iPad|iPod/.test(ua) ? 'iPhone' : /Android/.test(ua) ? 'Android' : 'Alt dispozitiv';
+  return os + ' ' + S.device.slice(0, 6);
+}
+function base(code) {
+  return { code: code, operator: S.operator, device: deviceLabel(), clientTime: new Date().toISOString(), cid: newId() };
+}
+function normCode(raw) {
+  let s = String(raw == null ? '' : raw).trim();
+  const m = s.match(/[?&]c=([^&#\s]+)/i);
+  if (m) { try { s = decodeURIComponent(m[1]); } catch (e) { s = m[1]; } }
+  return s.trim().toUpperCase();
+}
+
+/* ---------- camera activă ---------- */
+function getRoom() {
+  const r = LS.get('room', null);
+  if (!r) return null;
+  if (Date.now() - r.ts > S.timeoutMin * 60000) { LS.del('room'); return null; }
+  return r;
+}
+function setPending(code) { LS.set('pending', { code: code, ts: Date.now() }); }
+function takePending() {
+  const p = LS.get('pending', null);
+  LS.del('pending');
+  return p && Date.now() - p.ts < 3 * 60000 ? p.code : null;
+}
+function setRoom(r) { r.ts = Date.now(); LS.set('room', r); renderPlate(); }
+function touchRoom() { const r = getRoom(); if (r) { r.ts = Date.now(); LS.set('room', r); } renderPlate(); }
+function clearRoom() { LS.del('room'); renderPlate(); }
+
+function renderPlate() {
+  const r = getRoom();
+  const el = $('#plate');
+  if (!r) {
+    el.className = 'plate empty';
+    el.innerHTML = '<div class="lbl">Camera activă</div><div class="code">Nicio cameră activă</div>' +
+      '<div class="meta">Scanați întâi eticheta de pe ușa camerei.</div>';
+  } else {
+    const left = Math.max(1, Math.ceil((r.ts + S.timeoutMin * 60000 - Date.now()) / 60000));
+    el.className = 'plate';
+    el.innerHTML = '<div class="lbl">Camera activă</div><div class="code">' + esc(r.code) + '</div>' +
+      '<div class="name">' + esc(r.name) + '</div>' +
+      '<div class="meta">Expiră în ' + left + ' min fără scanări. Eticheta ' + esc(r.sticker) + '.</div>';
+  }
+  $('#closeRoomBtn').hidden = !r;
+}
+
+/* ---------- afișarea rezultatelor ---------- */
+function show(kind, title, o) {
+  o = o || {};
+  let h = '<h2>' + esc(title) + '</h2>';
+  if (o.device) {
+    h += '<div class="dev"><div class="n">' + esc(o.device.name) + '</div><div class="s">' + esc(o.device.serial) + '</div></div>';
+  }
+  (o.lines || []).forEach(l => { h += '<p>' + esc(l) + '</p>'; });
+  if (o.note) h += '<p class="note">' + esc(o.note) + '</p>';
+  const el = $('#result');
+  el.className = 'result ' + kind;
+  el.innerHTML = h;
+}
+
+function addHistory(code, label, kind, cid) {
+  S.history.unshift({ t: Date.now(), code: code, label: label, kind: kind, cid: cid || '' });
+  S.history = S.history.slice(0, 15);
+  LS.set('history', S.history);
+  renderHistory();
+}
+function updateHistory(cid, label, kind) {
+  const h = S.history.find(x => x.cid && x.cid === cid);
+  if (h) { h.label = label; h.kind = kind; LS.set('history', S.history); renderHistory(); }
+}
+function renderHistory() {
+  const el = $('#history');
+  if (!S.history.length) { el.innerHTML = '<li><span></span><span></span><span class="muted">Nicio scanare încă.</span></li>'; return; }
+  el.innerHTML = S.history.map(h => {
+    const d = new Date(h.t);
+    const t = String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0');
+    return '<li class="' + esc(h.kind) + '"><span class="d"></span><span class="t">' + t + '</span><span>' +
+      esc(h.label) + ' <span class="c">' + esc(h.code) + '</span></span></li>';
+  }).join('');
+  renderActions();
+}
+
+function renderStatus() {
+  $('#project').textContent = S.project || 'Scanare echipamente';
+  const on = navigator.onLine;
+  $('#conn').classList.toggle('off', !on);
+  $('#connTxt').textContent = on ? 'Online' : 'Fără conexiune';
+  const q = S.queue.length;
+  $('#queueChip').hidden = !q;
+  $('#queueChip').textContent = q + ' în așteptare';
+  $('#teamChip').hidden = !S.team;
+}
+
+/* ---------- sunet și vibrație ---------- */
+let audioCtx = null;
+function unlockAudio() {
+  try { if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)(); if (audioCtx.state === 'suspended') audioCtx.resume(); } catch (e) { /* */ }
+}
+function tone(freq, start, dur) {
+  const o = audioCtx.createOscillator(), g = audioCtx.createGain();
+  o.frequency.value = freq; o.connect(g); g.connect(audioCtx.destination);
+  const t = audioCtx.currentTime + start;
+  g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(0.25, t + 0.01);
+  g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+  o.start(t); o.stop(t + dur + 0.02);
+}
+function feedback(kind) {
+  try {
+    if (audioCtx && audioCtx.state === 'running') {
+      if (kind === 'ok') tone(1046, 0, 0.12);
+      else if (kind === 'warn') { tone(660, 0, 0.12); tone(660, 0.18, 0.12); }
+      else if (kind === 'err') tone(220, 0, 0.35);
+    }
+    if (navigator.vibrate) navigator.vibrate(kind === 'ok' ? 60 : kind === 'warn' ? [80, 60, 80] : [250]);
+  } catch (e) { /* */ }
+}
+
+/* ---------- procesarea unui cod ---------- */
+async function handleCode(raw) {
+  const code = normCode(raw);
+  const now = Date.now();
+  if (S.busy || !code) return;
+  if (code === S.lastCode && now - S.lastTime < 4000) return;
+  S.lastCode = code; S.lastTime = now;
+  if (!/^R-\d+$/.test(code) && !/^E-\d+$/.test(code)) {
+    show('err', 'Cod din afara sistemului', { lines: ['Codul scanat nu este o etichetă de cameră sau de echipament.', 'Scanați eticheta QR a sistemului.'] });
+    feedback('err');
+    return;
+  }
+  S.busy = true;
+  try {
+    if (code.charAt(0) === 'R') await onRoom(code); else await onDevice(code);
+  } catch (e) {
+    show('err', 'Eroare', { lines: [e.message] }); feedback('err');
+  } finally {
+    S.busy = false;
+    maybeAskName();
+  }
+}
+
+async function onRoom(code) {
+  if (!navigator.onLine) return roomOffline(code);
+  let r;
+  try { r = await api('scan', base(code)); }
+  catch (e) { if (e.network) return roomOffline(code); throw e; }
+  switch (r.result) {
+    case 'room': return roomActivated(code, r, false);
+    case 'unbound':
+      if (S.team) return bindRoomFlow(code);
+      show('err', 'Etichetă de cameră neconfigurată', { lines: ['Eticheta ' + code + ' nu este încă legată de o cameră.', 'Doar un configurator o poate lega.'] });
+      feedback('err'); return;
+    case 'info':
+      show('info', 'Camera ' + r.room.code, { lines: [r.room.name, 'Proiectul este închis: scanarea nu a fost înregistrată.'] });
+      feedback('ok'); return;
+    case 'unknown':
+      show('err', 'Etichetă necunoscută', { lines: ['Codul ' + code + ' nu există în registrul acestui proiect.', 'Anunțați coordonatorul.'] });
+      feedback('err'); addHistory(code, 'Etichetă necunoscută', 'err'); return;
+    case 'cancelled':
+      show('err', 'Etichetă anulată', { lines: ['Eticheta ' + code + ' a fost anulată și nu mai poate fi folosită.'] });
+      feedback('err'); return;
+    default: return;
+  }
+}
+
+async function roomActivated(code, r, justBound) {
+  S.timeoutMin = r.timeoutMin || S.timeoutMin; LS.set('timeout', S.timeoutMin);
+  S.rooms[code] = { code: r.room.code, name: r.room.name }; LS.set('rooms', S.rooms);
+  setRoom({ sticker: code, code: r.room.code, name: r.room.name });
+  addHistory(code, (justBound ? 'Cameră legată: ' : 'Cameră activată: ') + r.room.code, 'ok');
+  const p = takePending();
+  if (p) return onDevice(p);
+  show('ok', justBound ? 'Etichetă de cameră legată' : 'Camera activă: ' + r.room.code,
+    { lines: [r.room.code + ' ' + r.room.name, 'Scanați acum echipamentele din cameră.'] });
+  feedback('ok');
+}
+
+function roomOffline(code) {
+  const c = S.rooms[code];
+  setRoom({ sticker: code, code: c ? c.code : code, name: c ? c.name : 'Cameră neconfirmată (fără conexiune)' });
+  enqueue(base(code));
+  show('wait', 'Cameră activată fără conexiune', { lines: [c ? c.code + ' ' + c.name : 'Eticheta ' + code + ' va fi verificată la reconectare.', 'Scanările se salvează pe telefon și se trimit automat.'] });
+  feedback('warn');
+  const p = takePending();
+  if (p) deviceOffline(p, getRoom());
+}
+
+async function onDevice(code) {
+  const room = getRoom();
+  if (!navigator.onLine) return deviceOffline(code, room);
+  let r;
+  try { r = await api('scan', Object.assign(base(code), { roomSticker: room ? room.sticker : '' })); }
+  catch (e) { if (e.network) return deviceOffline(code, room); throw e; }
+  switch (r.result) {
+    case 'ok': return showDeviceResult(code, r, false);
+    case 'wrong': return showDeviceResult(code, r, false);
+    case 'needRoom':
+      setPending(code);
+      show('warn', 'Scanați eticheta camerei', { device: r.device, lines: ['Echipamentul se înregistrează imediat după scanarea camerei.'] });
+      feedback('warn'); return;
+    case 'badRoom':
+      clearRoom(); setPending(code);
+      show('err', 'Camera activă nu este validă', { lines: ['Scanați din nou eticheta de pe ușa camerei.'] });
+      feedback('err'); return;
+    case 'unbound':
+      if (!S.team) {
+        show('err', 'Etichetă neconfigurată', { lines: ['Eticheta ' + code + ' nu este încă legată de un echipament.', 'Doar un configurator o poate lega.'] });
+        feedback('err'); return;
+      }
+      if (!room) {
+        setPending(code);
+        show('warn', 'Scanați întâi camera', { lines: ['Eticheta ' + code + ' este nouă. După scanarea camerei veți putea alege echipamentul.'] });
+        feedback('warn'); return;
+      }
+      return bindDeviceFlow(code, room);
+    case 'info':
+      show('info', r.device.name, { device: r.device, lines: ['Destinație: ' + r.device.dest + ' ' + r.device.destName, 'Proiectul este închis: scanarea nu a fost înregistrată.'] });
+      feedback('ok'); return;
+    case 'unknown':
+      show('err', 'Etichetă necunoscută', { lines: ['Codul ' + code + ' nu există în registrul acestui proiect.', 'Anunțați coordonatorul.'] });
+      feedback('err'); addHistory(code, 'Etichetă necunoscută', 'err'); return;
+    case 'cancelled':
+      show('err', 'Etichetă anulată', { lines: ['Eticheta ' + code + ' a fost anulată.', 'Anunțați coordonatorul pentru o etichetă nouă.'] });
+      feedback('err'); addHistory(code, 'Etichetă anulată', 'err'); return;
+    case 'error':
+      show('err', 'Eroare de date', { lines: [r.message] }); feedback('err'); return;
+    default: return;
+  }
+}
+
+function showDeviceResult(code, r, justBound) {
+  touchRoom();
+  if (r.result === 'ok') {
+    show('ok', justBound ? 'Etichetă legată: conform' : 'Conform', { device: r.device, lines: ['În camera corectă: ' + r.room.code + ' ' + r.room.name] });
+    feedback('ok');
+    addHistory(code, r.device.name + (justBound ? ': legat, conform' : ': conform'), 'ok');
+  } else {
+    show('warn', justBound ? 'Etichetă legată: locație greșită' : 'Locație greșită', {
+      device: r.device,
+      lines: ['Aparține camerei ' + r.destination.code + ' ' + r.destination.name + '.', 'Scanat în ' + r.room.code + ' ' + r.room.name + '.'],
+      note: 'Mutați echipamentul în camera corectă sau anunțați coordonatorul.'
+    });
+    feedback('warn');
+    addHistory(code, r.device.name + ': locație greșită', 'warn');
+  }
+  if (r.stale) addHistory(code, 'Scanare mai veche: locația nu a fost suprascrisă', 'wait');
+}
+
+function deviceOffline(code, room) {
+  if (!room) {
+    setPending(code);
+    show('warn', 'Scanați întâi camera', { lines: ['Fără conexiune: echipamentul se salvează după scanarea camerei.'] });
+    feedback('warn'); return;
+  }
+  const item = Object.assign(base(code), { roomSticker: room.sticker });
+  enqueue(item);
+  touchRoom();
+  show('wait', 'Salvat pe telefon', { lines: ['Eticheta ' + code + ' în camera ' + room.code + '.', 'Se trimite automat când revine conexiunea.'] });
+  feedback('ok');
+  addHistory(code, 'În așteptare (fără conexiune)', 'wait', item.cid);
+}
+
+/* ---------- coada pentru lucrul fără conexiune ---------- */
+function enqueue(item) {
+  item.queued = true;
+  S.queue.push(item);
+  LS.set('queue', S.queue);
+  renderStatus();
+}
+const QUEUE_LABEL = {
+  ok: ['Trimis: conform', 'ok'], wrong: ['Trimis: locație greșită', 'warn'], room: ['Trimis: cameră', 'ok'],
+  duplicate: ['Trimis', 'ok'], unbound: ['Etichetă nelegată: legați-o când aveți conexiune', 'err'],
+  unknown: ['Etichetă necunoscută', 'err'], cancelled: ['Etichetă anulată', 'err'],
+  badRoom: ['Camera nu era validă: scanați din nou camera și echipamentul', 'err'],
+  needRoom: ['Fără cameră: scanați din nou', 'err'], info: ['Proiect închis: neînregistrat', 'wait']
+};
+async function flush() {
+  if (S.flushing || !S.queue.length || !navigator.onLine || !S.apiOk) return;
+  S.flushing = true;
+  let more = false;
+  try {
+    const batch = S.queue.slice(0, 50);
+    const r = await api('scanBatch', { items: batch });
+    const sent = new Set(batch.map(b => b.cid));
+    S.queue = S.queue.filter(q => !sent.has(q.cid));
+    LS.set('queue', S.queue);
+    let problems = 0;
+    r.results.forEach(x => {
+      const lab = QUEUE_LABEL[x.result] || [x.message || 'Eroare', 'err'];
+      if (lab[1] === 'err' || lab[1] === 'warn') problems++;
+      updateHistory(x.cid, lab[0], lab[1]);
+    });
+    if (!S.busy) {
+      show(problems ? 'warn' : 'ok', 'Scanări trimise', { lines: [r.results.length + ' scanări salvate pe telefon au fost trimise.', problems ? problems + ' necesită atenție: vedeți lista de mai jos.' : 'Toate au fost înregistrate.'] });
+    }
+    more = S.queue.length > 0;
+  } catch (e) { /* se reîncearcă automat */ }
+  finally { S.flushing = false; renderStatus(); if (more) setTimeout(flush, 1500); }
+}
+
+/* ---------- foaia suprapusă ---------- */
+async function openSheet(title, bodyHtml, footHtml) {
+  if (S.scanning) { S.resumeAfterSheet = true; await stopScan(); }
+  $('#sheetTitle').textContent = title;
+  $('#sheetBody').innerHTML = bodyHtml || '';
+  $('#sheetFoot').hidden = !footHtml;
+  $('#sheetFootIn').innerHTML = footHtml || '';
+  $('#sheet').hidden = false;
+  $('#sheetBody').scrollTop = 0;
+}
+function setSheet(bodyHtml, footHtml) {
+  $('#sheetBody').innerHTML = bodyHtml || '';
+  $('#sheetFoot').hidden = !footHtml;
+  $('#sheetFootIn').innerHTML = footHtml || '';
+  $('#sheetBody').scrollTop = 0;
+}
+function closeSheet() {
+  $('#sheet').hidden = true;
+  if (S.resumeAfterSheet) { S.resumeAfterSheet = false; startScan(); }
+}
+
+/* ---------- legarea unei etichete de echipament ---------- */
+const flat = s => String(s || '').toUpperCase().replace(/[\s\-_.\/]/g, '');
+
+async function bindDeviceFlow(code, room) {
+  await openSheet('Leagă eticheta ' + code, '<p class="muted">Se încarcă lista echipamentelor nelegate...</p>');
+  let r;
+  try { r = await api('listUnbound', { type: 'device', team: S.team }); }
+  catch (e) { return setSheet('<div class="alert err">' + esc(e.message) + '</div>', '<button class="btn sec" data-act="close">Închide</button>'); }
+  const all = r.devices;
+  const here = d => d.dest.toUpperCase() === room.code.toUpperCase();
+
+  setSheet(
+    '<p style="margin-top:0">Camera activă: <b>' + esc(room.code) + '</b> ' + esc(room.name) + '</p>' +
+    '<label for="q" class="group" style="display:block;margin-top:4px">Căutați după serie sau denumire</label>' +
+    '<input type="search" id="q" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="De exemplu ultimele 4 caractere ale seriei">' +
+    '<div id="pickList"></div>',
+    '<button class="btn sec" data-act="close">Renunță</button>'
+  );
+
+  function draw() {
+    const q = flat($('#q').value);
+    let items, title, empty;
+    if (q.length < 2) {
+      items = all.filter(here);
+      title = 'Planificate pentru această cameră (' + items.length + ')';
+      empty = 'Nu mai există echipamente nelegate planificate pentru această cameră. Căutați după serie.';
+    } else {
+      items = all.filter(d => flat(d.serial).indexOf(q) >= 0 || flat(d.name).indexOf(q) >= 0)
+        .sort((a, b) => (here(b) ? 1 : 0) - (here(a) ? 1 : 0));
+      title = 'Rezultate (' + items.length + ')';
+      empty = 'Nicio serie nelegată nu corespunde căutării. Verificați seria sau anunțați coordonatorul.';
+    }
+    $('#pickList').innerHTML = '<div class="group">' + esc(title) + '</div>' + (items.length ? items.slice(0, 60).map((d, i) =>
+      '<button class="pick" data-i="' + all.indexOf(d) + '"><div class="n">' + esc(d.name) + '</div><div class="s">' + esc(d.serial) +
+      '</div><div class="m">' + esc([d.producer, d.model].filter(Boolean).join(' ')) + ' · destinație ' + esc(d.dest) + ' ' + esc(d.destName) + '</div></button>'
+    ).join('') : '<p class="muted">' + esc(empty) + '</p>');
+  }
+  draw();
+  $('#q').addEventListener('input', draw);
+  $('#pickList').addEventListener('click', e => {
+    const b = e.target.closest('.pick');
+    if (b) confirmDevice(code, room, all[Number(b.dataset.i)], () => bindDeviceFlow(code, room));
+  });
+}
+
+function confirmDevice(code, room, d, back) {
+  const elsewhere = d.dest.toUpperCase() !== room.code.toUpperCase();
+  setSheet(
+    '<p style="margin-top:0">Comparați seria de mai jos cu plăcuța de pe echipament, caracter cu caracter.</p>' +
+    '<div class="serialbig">' + esc(d.serial) + '</div>' +
+    '<dl class="kv"><dt>Echipament</dt><dd>' + esc(d.name) + '</dd><dt>Producător</dt><dd>' + esc(d.producer) + ' ' + esc(d.model) +
+    '</dd><dt>Eticheta</dt><dd class="mono">' + esc(code) + '</dd><dt>Destinație</dt><dd>' + esc(d.dest) + ' ' + esc(d.destName) + '</dd></dl>' +
+    (elsewhere ? '<div class="alert warn">Echipamentul este planificat pentru ' + esc(d.dest) + ' ' + esc(d.destName) +
+      '. Va fi înregistrat în ' + esc(room.code) + ' ca locație greșită.</div>' : '') +
+    '<div id="bindMsg"></div>',
+    '<button class="btn" id="bindGo">Seria corespunde: leagă eticheta</button><button class="btn sec" id="bindBack">Înapoi la listă</button>'
+  );
+  $('#bindBack').onclick = back;
+  $('#bindGo').onclick = async () => {
+    $('#bindGo').disabled = true; $('#bindGo').textContent = 'Se leagă...';
+    try {
+      const r = await api('bind', Object.assign(base(code), { team: S.team, serial: d.serial, roomSticker: room.sticker }));
+      closeSheet();
+      showDeviceResult(code, r, true);
+    } catch (e) {
+      $('#bindMsg').innerHTML = '<div class="alert err">' + esc(e.network ? 'Legarea necesită conexiune la internet. Încercați din nou când aveți semnal.' : e.message) + '</div>';
+      $('#bindGo').disabled = false; $('#bindGo').textContent = 'Seria corespunde: leagă eticheta';
+      feedback('err');
+    }
+  };
+}
+
+/* ---------- legarea unei etichete de cameră ---------- */
+async function bindRoomFlow(code) {
+  await openSheet('Leagă eticheta de cameră ' + code, '<p class="muted">Se încarcă lista camerelor...</p>');
+  let r;
+  try { r = await api('listUnbound', { type: 'room', team: S.team }); }
+  catch (e) { return setSheet('<div class="alert err">' + esc(e.message) + '</div>', '<button class="btn sec" data-act="close">Închide</button>'); }
+  const rooms = r.rooms;
+  setSheet(
+    '<p style="margin-top:0">Alegeți camera pe a cărei ușă se află eticheta ' + esc(code) + '.</p>' +
+    '<input type="search" id="rq" autocomplete="off" spellcheck="false" placeholder="Căutați după cod sau denumire">' +
+    '<div id="roomList"></div>',
+    '<button class="btn sec" data-act="close">Renunță</button>'
+  );
+  function draw() {
+    const q = flat($('#rq').value);
+    const items = rooms.filter(x => !q || flat(x.code).indexOf(q) >= 0 || flat(x.name).indexOf(q) >= 0);
+    $('#roomList').innerHTML = '<div class="group">Camere fără etichetă (' + items.length + ')</div>' + (items.length ? items.map(x =>
+      '<button class="pick" data-i="' + rooms.indexOf(x) + '"><div class="s">' + esc(x.code) + '</div><div class="n">' + esc(x.name) +
+      '</div><div class="m">' + esc(x.level) + '</div></button>').join('') : '<p class="muted">Toate camerele au deja etichete. Anunțați coordonatorul.</p>');
+  }
+  draw();
+  $('#rq').addEventListener('input', draw);
+  $('#roomList').addEventListener('click', e => {
+    const b = e.target.closest('.pick');
+    if (!b) return;
+    const x = rooms[Number(b.dataset.i)];
+    setSheet(
+      '<p style="margin-top:0">Verificați că eticheta este lipită pe ușa acestei camere.</p>' +
+      '<div class="serialbig">' + esc(x.code) + '</div><p style="text-align:center;font-size:18px;margin:0">' + esc(x.name) + '</p>' +
+      '<div id="bindMsg"></div>',
+      '<button class="btn" id="bindGo">Leagă eticheta ' + esc(code) + '</button><button class="btn sec" id="bindBack">Înapoi la listă</button>'
+    );
+    $('#bindBack').onclick = () => bindRoomFlow(code);
+    $('#bindGo').onclick = async () => {
+      $('#bindGo').disabled = true;
+      try {
+        const res = await api('bind', Object.assign(base(code), { team: S.team, roomCode: x.code }));
+        closeSheet();
+        roomActivated(code, res, true);
+      } catch (err) {
+        $('#bindMsg').innerHTML = '<div class="alert err">' + esc(err.network ? 'Legarea necesită conexiune la internet.' : err.message) + '</div>';
+        $('#bindGo').disabled = false; feedback('err');
+      }
+    };
+  });
+}
+
+/* ---------- verificarea camerei ---------- */
+async function closeRoomFlow() {
+  const room = getRoom();
+  if (!room) return;
+  await openSheet('Verificare ' + room.code, '<p class="muted">Se încarcă situația camerei...</p>');
+  let r;
+  try { r = await api('closeRoom', { roomSticker: room.sticker }); }
+  catch (e) {
+    return setSheet('<div class="alert err">' + esc(e.network ? 'Verificarea camerei necesită conexiune la internet.' : e.message) + '</div>',
+      '<button class="btn sec" data-act="close">Înapoi</button>');
+  }
+  const by = st => r.planned.filter(d => d.state === st);
+  const li = (d, extra) => '<li><div>' + esc(d.name) + '</div><div class="s">' + esc(d.serial) + (d.sticker ? ' · ' + esc(d.sticker) : '') + '</div>' +
+    (extra ? '<div class="muted" style="font-size:14px">' + esc(extra) + '</div>' : '') + '</li>';
+  const section = (title, arr, fmt, cls) => arr.length ? '<div class="group">' + esc(title) + ' (' + arr.length + ')</div>' +
+    (cls ? '<div class="alert ' + cls + '" style="padding:4px 12px">' : '') + '<ul class="list-plain">' + arr.map(fmt).join('') + '</ul>' + (cls ? '</div>' : '') : '';
+  const missing = by('missing'), elsewhere = by('elsewhere'), ok = by('ok'), unbound = by('unbound');
+  let h = '<p style="margin-top:0"><b>' + esc(r.room.code) + '</b> ' + esc(r.room.name) + '<br><span class="muted">Audit: ' + esc(r.auditName) + '</span></p>';
+  if (!missing.length && !elsewhere.length && !r.foreign.length && !unbound.length) {
+    h += '<div class="alert ok">Toate cele ' + ok.length + ' echipamente planificate au fost scanate în această cameră.</div>';
+  }
+  h += section('Lipsă: nescanate în auditul curent', missing, d => li(d, 'Căutați-l în cameră și scanați-l.'), 'err');
+  h += section('Găsite în altă cameră', elsewhere, d => li(d, 'Scanat ultima dată în ' + d.current + ' ' + d.currentName), 'warn');
+  h += section('Aflate aici, dar aparțin altei camere', r.foreign, d => li(d, 'Destinație: ' + d.dest + ' ' + d.destName), 'warn');
+  h += section('Fără etichetă (nelegate)', unbound, d => li(d, ''), '');
+  h += section('Confirmate în această cameră', ok, d => li(d, ''), '');
+  setSheet(h, '<button class="btn" id="roomDone">Am terminat camera</button><button class="btn sec" data-act="close">Continuă scanarea</button>');
+  $('#roomDone').onclick = () => {
+    clearRoom(); closeSheet();
+    show('info', 'Camera ' + room.code + ' a fost închisă', { lines: ['Scanați eticheta următoarei camere.'] });
+  };
+}
+
+/* ---------- setări ---------- */
+async function openSettings() {
+  const q = S.queue.length;
+  await openSheet('Setări',
+    '<div class="card"><h3>Numele dumneavoastră</h3><p class="muted" style="margin:0 0 8px">Apare în jurnal lângă scanările de pe acest telefon.</p>' +
+    '<input type="text" id="setName" value="' + esc(S.operator) + '" placeholder="Prenume și nume" autocomplete="name">' +
+    '<div class="row"><button class="btn small" id="setNameSave">Salvează numele</button></div></div>' +
+    '<div class="card"><h3>Mod configurator</h3>' + (S.team
+      ? '<p style="margin:0">Activ pe acest telefon. Puteți lega etichete noi de camere și echipamente.</p><div class="row"><button class="btn small sec" id="teamOff">Dezactivează pe acest telefon</button></div>'
+      : '<p class="muted" style="margin:0 0 8px">Necesar doar pentru legarea etichetelor noi. Codul îl primiți de la coordonator.</p>' +
+        '<input type="tel" inputmode="numeric" id="teamIn" placeholder="Cod de echipă" autocomplete="off"><div class="row"><button class="btn small" id="teamOn">Activează</button></div>') +
+    '<div id="teamMsg"></div></div>' +
+    '<div class="card"><h3>Scanări salvate pe telefon</h3><p style="margin:0">' + (q ? q + ' scanări așteaptă conexiunea.' : 'Nicio scanare în așteptare.') + '</p>' +
+    (q ? '<div class="row"><button class="btn small sec" id="flushNow">Trimite acum</button></div>' : '') + '</div>' +
+    '<div class="card"><h3>Despre acest telefon</h3><dl class="kv"><dt>Dispozitiv</dt><dd>' + esc(deviceLabel()) + '</dd>' +
+    '<dt>Versiune</dt><dd>' + APP_VERSION + '</dd><dt>Server</dt><dd>' + (S.apiOk ? 'Configurat' : 'Neconfigurat (API_URL)') + '</dd></dl>' +
+    '<div class="row"><button class="btn small sec" id="clearHist">Golește istoricul</button></div></div>',
+    '<button class="btn sec" data-act="close">Închide</button>');
+  $('#setNameSave').onclick = () => {
+    S.operator = $('#setName').value.trim().slice(0, 60); LS.set('operator', S.operator);
+    S.namePrompted = true; LS.set('namePrompted', true); $('#nameCard').hidden = true;
+    $('#setNameSave').textContent = 'Salvat';
+  };
+  if ($('#teamOff')) $('#teamOff').onclick = () => { S.team = ''; LS.del('team'); renderStatus(); openSettings(); };
+  if ($('#teamOn')) $('#teamOn').onclick = async () => {
+    const v = $('#teamIn').value.trim();
+    if (!v) return;
+    $('#teamOn').disabled = true;
+    try {
+      const r = await api('checkTeam', { team: v });
+      if (r.valid) { S.team = v; LS.set('team', v); renderStatus(); openSettings(); }
+      else { $('#teamMsg').innerHTML = '<div class="alert err">Cod de echipă greșit.</div>'; $('#teamOn').disabled = false; }
+    } catch (e) { $('#teamMsg').innerHTML = '<div class="alert err">' + esc(e.message) + '</div>'; $('#teamOn').disabled = false; }
+  };
+  if ($('#flushNow')) $('#flushNow').onclick = async () => { await flush(); openSettings(); };
+  $('#clearHist').onclick = () => { S.history = []; LS.set('history', []); renderHistory(); $('#clearHist').textContent = 'Istoric golit'; };
+}
+
+/* ---------- numele, o singură dată ---------- */
+function maybeAskName() {
+  if (S.namePrompted || S.operator) return;
+  $('#nameCard').hidden = false;
+}
+$('#nameSave').onclick = () => {
+  S.operator = $('#nameInput').value.trim().slice(0, 60);
+  LS.set('operator', S.operator); S.namePrompted = true; LS.set('namePrompted', true);
+  $('#nameCard').hidden = true;
+};
+$('#nameSkip').onclick = () => { S.namePrompted = true; LS.set('namePrompted', true); $('#nameCard').hidden = true; };
+
+/* ---------- camera telefonului ---------- */
+let qr = null, wakeLock = null;
+async function startScan() {
+  unlockAudio();
+  if (S.scanning) return;
+  if (typeof Html5Qrcode === 'undefined') {
+    show('err', 'Scannerul nu s-a încărcat', { lines: ['Verificați conexiunea la internet și reîncărcați pagina.', 'Până atunci puteți scana etichetele cu aplicația Cameră a telefonului.'] });
+    return;
+  }
+  $('#scannerWrap').hidden = false;
+  try {
+    if (!qr) qr = new Html5Qrcode('reader', { formatsToSupport: [Html5QrcodeSupportedFormats.QR_CODE], verbose: false,
+      experimentalFeatures: { useBarCodeDetectorIfSupported: true } });
+    await qr.start({ facingMode: 'environment' },
+      { fps: 12, qrbox: (w, h) => { const s = Math.floor(Math.min(w, h) * 0.72); return { width: s, height: s }; } },
+      text => handleCode(text), () => {});
+    S.scanning = true;
+    try { if (navigator.wakeLock) wakeLock = await navigator.wakeLock.request('screen'); } catch (e) { /* */ }
+  } catch (e) {
+    $('#scannerWrap').hidden = true;
+    const n = (e && e.name) || String(e);
+    const msg = /NotAllowed|Permission/i.test(n + String(e))
+      ? 'Accesul la cameră a fost refuzat. Permiteți accesul la cameră pentru această pagină din setările browserului, apoi reîncercați.'
+      : /NotFound/i.test(n) ? 'Nu a fost găsită o cameră pe acest dispozitiv.' : 'Detalii: ' + String(e && e.message || e);
+    show('err', 'Camera nu poate fi pornită', { lines: [msg] });
+  }
+  renderActions();
+}
+async function stopScan() {
+  if (qr && S.scanning) { try { await qr.stop(); } catch (e) { /* */ } }
+  S.scanning = false;
+  $('#scannerWrap').hidden = true;
+  try { if (wakeLock) { await wakeLock.release(); wakeLock = null; } } catch (e) { /* */ }
+  renderActions();
+}
+function renderActions() {
+  $('#scanTxt').textContent = S.scanning ? 'Oprește camera' : (S.history.length ? 'Scanează următorul' : 'Pornește camera');
+}
+
+/* ---------- evenimente ---------- */
+$('#scanBtn').onclick = () => (S.scanning ? stopScan() : startScan());
+$('#closeRoomBtn').onclick = closeRoomFlow;
+$('#settingsBtn').onclick = openSettings;
+$('#sheetClose').onclick = closeSheet;
+$('#sheet').addEventListener('click', e => { if (e.target.closest('[data-act="close"]')) closeSheet(); });
+document.addEventListener('keydown', e => { if (e.key === 'Escape' && !$('#sheet').hidden) closeSheet(); });
+window.addEventListener('online', () => { renderStatus(); flush(); });
+window.addEventListener('offline', renderStatus);
+document.addEventListener('visibilitychange', () => { if (document.hidden && S.scanning) stopScan(); else renderPlate(); });
+document.addEventListener('pointerdown', unlockAudio, { once: true });
+setInterval(renderPlate, 30000);
+setInterval(flush, 20000);
+
+/* ---------- pornire ---------- */
+(function init() {
+  renderPlate(); renderHistory(); renderStatus(); renderActions();
+  if (!S.apiOk) {
+    show('err', 'Pagina nu este configurată', { lines: ['Completați adresa aplicației web (API_URL) în fișierul index.html, conform ghidului de instalare.'] });
+  }
+  if (S.apiOk) {
+    api('bootstrap', { team: S.team }).then(r => {
+      S.project = r.project; LS.set('project', r.project);
+      S.timeoutMin = r.timeoutMin || 20; LS.set('timeout', S.timeoutMin);
+      S.rooms = r.rooms || {}; LS.set('rooms', S.rooms);
+      if (S.team && !r.teamValid) { S.team = ''; LS.del('team'); }
+      renderStatus(); renderPlate();
+    }).catch(() => {});
+    flush();
+  }
+  const params = new URLSearchParams(location.search);
+  const c = params.get('c');
+  if (c) {
+    history.replaceState(null, '', location.pathname);
+    handleCode(c);
+  } else if (S.apiOk) {
+    show('info', 'Gata de scanare', { lines: ['Scanați eticheta de pe ușa camerei, apoi etichetele echipamentelor din cameră.'] });
+  }
+})();
+</script>
+</body>
+</html>

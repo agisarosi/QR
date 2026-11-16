@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="ro">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Tipărire etichete QR</title>
+<script src="https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.js"></script>
+<style>
+:root { --ink: #161A18; --muted: #59615C; --line: #D3D9D5; --bg: #ECEFED; --warn: #A85A00; --warn-bg: #FBEBD6; }
+* { box-sizing: border-box; }
+body { margin: 0; font-family: system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif; color: var(--ink); background: var(--bg); }
+.panel { max-width: 760px; margin: 0 auto; padding: 20px 16px; }
+h1 { font-size: 22px; margin: 0 0 4px; }
+p { line-height: 1.45; }
+.muted { color: var(--muted); }
+fieldset { border: 1px solid var(--line); border-radius: 12px; background: #fff; margin: 0 0 12px; padding: 12px 14px; }
+legend { font-weight: 600; padding: 0 4px; }
+.grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; }
+label { display: block; font-size: 14px; color: var(--muted); }
+input[type=number], input[type=text] { width: 100%; height: 40px; border: 1px solid var(--line); border-radius: 8px; padding: 0 10px; font: inherit; margin-top: 4px; }
+.check { display: flex; gap: 8px; align-items: center; color: var(--ink); font-size: 15px; margin-top: 8px; }
+.btns { display: flex; gap: 10px; flex-wrap: wrap; margin: 14px 0; }
+button { font: inherit; font-weight: 600; min-height: 46px; padding: 0 18px; border-radius: 10px; border: 1px solid var(--ink); background: var(--ink); color: #fff; cursor: pointer; }
+button.sec { background: #fff; color: var(--ink); border-color: var(--line); }
+.alert { background: var(--warn-bg); border-left: 5px solid var(--warn); border-radius: 10px; padding: 10px 12px; margin: 10px 0; }
+code { font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 13px; word-break: break-all; }
+
+/* etichete, dimensiuni reale */
+.sheet { background: #fff; margin: 0 auto 20px; width: 194mm; display: flex; flex-wrap: wrap; align-content: flex-start; }
+.sheet h2 { width: 100%; font-size: 4mm; margin: 2mm 0; }
+.lab { border: 0.25mm dashed #9A9A9A; display: flex; align-items: center; overflow: hidden; break-inside: avoid; page-break-inside: avoid; }
+.lab svg { display: block; width: 100%; height: 100%; }
+.lab .code { font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace; font-weight: 700; white-space: nowrap; }
+.lab .kind, .lab .org { color: #333; }
+.dev { width: 50mm; height: 30mm; padding: 1.5mm 2mm 1.5mm 1.5mm; gap: 2mm; }
+.dev .q { width: 27mm; height: 27mm; flex: none; }
+.dev .code { font-size: 3.3mm; }
+.dev .kind { font-size: 2.6mm; margin-top: 1mm; }
+.dev .org { font-size: 2.3mm; margin-top: 1mm; }
+.room { width: 97mm; height: 60mm; padding: 3mm; gap: 3mm; }
+.room .q { width: 50mm; height: 50mm; flex: none; }
+.room .code { font-size: 7mm; }
+.room .kind { font-size: 3.6mm; margin-top: 1.5mm; }
+.room .org { font-size: 3mm; margin-top: 1.5mm; }
+.room .fill { font-size: 3.2mm; margin-top: 5mm; color: #333; line-height: 2; }
+.test .kind { font-weight: 700; color: #000; }
+
+@media print {
+  @page { size: A4; margin: 8mm; }
+  body { background: #fff; }
+  .panel { display: none; }
+  .sheet { margin: 0; }
+  .sheet.devs { break-before: page; page-break-before: always; }
+  .sheet h2 { display: none; }
+}
+</style>
+</head>
+<body>
+<div class="panel">
+  <h1>Tipărire etichete QR</h1>
+  <p class="muted">Pentru simulare: tipăriți pe hârtie A4 obișnuită și decupați pe liniile punctate. Pentru comanda la tipografie: descărcați lista CSV.</p>
+  <div id="warn"></div>
+  <p>Codurile vor conține adresa: <code id="sample"></code></p>
+
+  <fieldset><legend>Etichete de cameră</legend>
+    <div class="grid">
+      <label>De la numărul<input type="number" id="rFrom" min="1" value="1"></label>
+      <label>Până la numărul<input type="number" id="rTo" min="0" value="7"></label>
+    </div>
+  </fieldset>
+  <fieldset><legend>Etichete de echipament</legend>
+    <div class="grid">
+      <label>De la numărul<input type="number" id="eFrom" min="1" value="1"></label>
+      <label>Până la numărul<input type="number" id="eTo" min="0" value="24"></label>
+    </div>
+    <label class="check"><input type="checkbox" id="foreign" checked> Adaugă codul de test E-999999 (nu există în registru, pentru testul „etichetă necunoscută”)</label>
+  </fieldset>
+  <fieldset><legend>Text pe etichetă (opțional)</legend>
+    <label>De exemplu numele firmei<input type="text" id="org" value="" maxlength="40"></label>
+  </fieldset>
+
+  <div class="btns">
+    <button id="printBtn">Tipărește</button>
+    <button class="sec" id="csvBtn">Descarcă lista CSV pentru tipografie</button>
+  </div>
+  <p class="muted">La tipărire alegeți scara 100% (dimensiune reală), nu „Potrivire la pagină”. Verificați cu o riglă: eticheta de echipament are 50 x 30 mm.</p>
+</div>
+
+<div class="sheet rooms" id="rooms"></div>
+<div class="sheet devs" id="devs"></div>
+
+<script>
+'use strict';
+const $ = s => document.querySelector(s);
+const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+const BASE = location.origin + location.pathname.replace(/[^\/]*$/, '');
+const urlFor = code => BASE + '?c=' + code;
+const pad = (n, w) => String(n).padStart(w, '0');
+
+function qrSvg(text) {
+  const q = qrcode(0, 'Q');
+  q.addData(text);
+  q.make();
+  const n = q.getModuleCount(), m = 4, size = n + 2 * m;
+  let d = '';
+  for (let r = 0; r < n; r++) for (let c = 0; c < n; c++) if (q.isDark(r, c)) d += 'M' + (c + m) + ' ' + (r + m) + 'h1v1h-1z';
+  return '<svg viewBox="0 0 ' + size + ' ' + size + '" shape-rendering="crispEdges" xmlns="http://www.w3.org/2000/svg">' +
+    '<rect width="' + size + '" height="' + size + '" fill="#fff"/><path d="' + d + '" fill="#000"/></svg>';
+}
+
+function codes() {
+  const rf = +$('#rFrom').value, rt = +$('#rTo').value, ef = +$('#eFrom').value, et = +$('#eTo').value;
+  const rooms = [], devs = [];
+  for (let i = rf; i <= rt && i - rf < 2000; i++) rooms.push('R-' + pad(i, 4));
+  for (let i = ef; i <= et && i - ef < 5000; i++) devs.push('E-' + pad(i, 6));
+  return { rooms, devs };
+}
+
+function render() {
+  $('#sample').textContent = urlFor('E-000001');
+  const warn = [];
+  if (location.protocol !== 'https:') warn.push('Pagina nu este deschisă de pe adresa publicată (https). Codurile QR ar conține o adresă greșită. Deschideți print.html de pe adresa GitHub Pages.');
+  if (typeof qrcode === 'undefined') warn.push('Generatorul de coduri QR nu s-a încărcat. Verificați conexiunea la internet și reîncărcați pagina.');
+  $('#warn').innerHTML = warn.map(w => '<div class="alert">' + esc(w) + '</div>').join('');
+  if (typeof qrcode === 'undefined') return;
+  const org = $('#org').value.trim();
+  const { rooms, devs } = codes();
+  $('#rooms').innerHTML = rooms.length ? '<h2>Etichete de cameră (' + rooms.length + ')</h2>' + rooms.map(c =>
+    '<div class="lab room"><div class="q">' + qrSvg(urlFor(c)) + '</div><div><div class="code">' + c + '</div>' +
+    '<div class="kind">Etichetă cameră</div>' + (org ? '<div class="org">' + esc(org) + '</div>' : '') +
+    '<div class="fill">Spațiu: ____________</div></div></div>').join('') : '';
+  const list = devs.slice();
+  if ($('#foreign').checked) list.push('E-999999');
+  $('#devs').innerHTML = list.length ? '<h2>Etichete de echipament (' + list.length + ')</h2>' + list.map(c =>
+    '<div class="lab dev' + (c === 'E-999999' ? ' test' : '') + '"><div class="q">' + qrSvg(urlFor(c)) + '</div><div><div class="code">' + c + '</div>' +
+    '<div class="kind">' + (c === 'E-999999' ? 'TEST: cod străin' : 'Echipament') + '</div>' +
+    (org ? '<div class="org">' + esc(org) + '</div>' : '') + '</div></div>').join('') : '';
+}
+
+function downloadCsv() {
+  const { rooms, devs } = codes();
+  const rows = [['cod', 'tip', 'continut_qr']]
+    .concat(rooms.map(c => [c, 'camera', urlFor(c)]))
+    .concat(devs.map(c => [c, 'echipament', urlFor(c)]));
+  const csv = rows.map(r => r.join(',')).join('\r\n');
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob(['\ufeff' + csv], { type: 'text/csv;charset=utf-8' }));
+  a.download = 'etichete_qr.csv';
+  document.body.appendChild(a); a.click(); a.remove();
+}
+
+['rFrom', 'rTo', 'eFrom', 'eTo', 'foreign', 'org'].forEach(id => $('#' + id).addEventListener('input', render));
+$('#printBtn').onclick = () => window.print();
+$('#csvBtn').onclick = downloadCsv;
+render();
+</script>
+</body>
+</html>
